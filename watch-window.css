@@ -1,0 +1,305 @@
+:root {
+    --ink: #18181b;
+    --ink-2: #3f3f46;
+    --muted: #a1a1aa;
+    --blue: #1d4ed8;
+    --orange: #c2410c;
+    --red: #b91c1c;
+    --green: #15803d;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+@keyframes fill-in {
+    from {
+        transform: translateX(-100%);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f7f7f8;
+    color: var(--ink);
+    font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+    -webkit-font-smoothing: antialiased;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    padding: 22px 18px 18px;
+}
+
+svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+.eyebrow {
+    align-self: flex-start;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(29, 78, 216, 0.08);
+    color: var(--blue);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 10px 0 16px;
+}
+
+.title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.cta {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 16px 4px 4px;
+    border: none;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    transition: transform 0.5s var(--ease);
+}
+
+.cta .ic {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    transition: transform 0.5s var(--ease);
+}
+
+.cta:hover {
+    transform: scale(1.02);
+}
+
+.cta:hover .ic {
+    transform: translateX(2px);
+}
+
+.cta:active {
+    transform: scale(0.98);
+}
+
+/* double-bezel list: tray + cards */
+.shell {
+    padding: 4px;
+    border-radius: 20px;
+    background: rgba(24, 24, 27, 0.04);
+    box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.06);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 10px 11px 14px;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 8px 20px -12px rgba(24, 24, 27, 0.22);
+    animation: rise 0.6s var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 80ms);
+    transition: box-shadow 0.5s var(--ease);
+}
+
+.item + .item {
+    margin-top: 4px;
+}
+
+.txt {
+    flex: 1;
+    min-width: 0;
+}
+
+.course {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.name {
+    margin: 2px 0 3px;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.due {
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.due.is-normal {
+    color: var(--blue);
+}
+
+.due.is-warn {
+    color: var(--orange);
+}
+
+.due.is-urgent {
+    color: var(--red);
+}
+
+/* how much of the video the report counts as studied; the fill slides in after its card rises */
+.watched {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+}
+
+.watched .track {
+    flex: 1;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(24, 24, 27, 0.07);
+}
+
+.watched .fill {
+    display: block;
+    width: calc(var(--p) * 100%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--blue);
+    animation: fill-in 0.9s var(--ease) both;
+    animation-delay: calc(200ms + var(--i, 0) * 80ms);
+}
+
+/* a fixed width keeps every card's track the same length */
+.watched .pct {
+    min-width: 32px;
+    color: var(--ink-2);
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.watched .time {
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.play {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #f4f4f5;
+    color: var(--ink);
+    transition: transform 0.5s var(--ease), background 0.5s var(--ease);
+}
+
+.play svg {
+    width: 12px;
+    height: 12px;
+}
+
+button.play:hover {
+    background: var(--ink);
+    color: #ffffff;
+    transform: scale(1.06);
+}
+
+button.play:active {
+    transform: scale(0.96);
+}
+
+.empty {
+    margin: 8px 0 0;
+    padding: 28px 12px;
+    border-radius: 20px;
+    background: rgba(24, 24, 27, 0.04);
+    color: #71717a;
+    font-size: 13px;
+    text-align: center;
+}
+
+.empty.is-clear {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--green);
+    font-weight: 600;
+}
+
+.empty.is-clear svg {
+    width: 28px;
+    height: 28px;
+}
+
+.foot {
+    margin: 14px 4px 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .item,
+    .watched .fill {
+        animation: none;
+    }
+
+    .cta,
+    .cta .ic,
+    .play {
+        transition: none;
+    }
+}
