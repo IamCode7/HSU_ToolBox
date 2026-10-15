@@ -11,13 +11,15 @@ const CAL_TONES = {
   done: ["#15803d", "#86efac"],
   handIn: ["#52525b", "#a1a1aa"],
 };
-// the kinds the switches next to the month show or hide; "video" covers watched videos too,
-// "submitted" both entries of a submitted assignment
+// the kinds the switches next to the month show or hide (calFilterKey): "video" is videos still to watch, "watched"
+// watched videos, "submitted" the day an assignment was handed in, "done" a submitted assignment on its due day
 const CAL_FILTER_KEY = "calFilter";
 const CAL_FILTERS = [
   { key: "assign", label: "남은 과제", tone: "todo" },
-  { key: "video", label: "영상", tone: "video" },
-  { key: "submitted", label: "제출 과제", tone: "done" },
+  { key: "video", label: "미시청 영상", tone: "video" },
+  { key: "watched", label: "시청 완료 영상", tone: "done" },
+  { key: "submitted", label: "제출 과제", tone: "handIn" },
+  { key: "done", label: "완료 과제", tone: "done" },
 ];
 
 // Solar icon set by 480 Design (CC BY 4.0)
@@ -31,7 +33,7 @@ let calMonth = null;
 let calSelected = null;
 let calCache = null;
 let calOpenWhenSynced = false;
-let calFilter = { assign: true, video: true, submitted: true };
+let calFilter = { assign: true, video: true, watched: true, submitted: true, done: true };
 // kinds just switched on: their chips and rows ease in on the redraw that follows
 let calFresh = [];
 
@@ -100,12 +102,15 @@ function getCalEvents() {
     if (!events.has(key)) events.set(key, []);
     events.get(key).push(event);
   };
+  const addShown = (date, event) => {
+    if (calFilter[calFilterKey(event)]) add(date, event);
+  };
   for (const [courseId, todos] of Object.entries(calCache?.todos || {})) {
     if (!Array.isArray(todos)) continue;
     for (const todo of todos) {
-      if (!calFilter[calFilterKey(todo)]) continue;
-      if (todo.end) add(calDueDay(todo.end), { ...todo, courseId, rank: todo.done ? 2 : 0, at: todo.end });
-      if (todo.submitted) add(new Date(todo.submitted), { ...todo, courseId, handIn: true, rank: 1, at: todo.submitted });
+      // the two entries of a submitted assignment fall under different switches, so each is checked on its own
+      if (todo.end) addShown(calDueDay(todo.end), { ...todo, courseId, rank: todo.done ? 2 : 0, at: todo.end });
+      if (todo.submitted) addShown(new Date(todo.submitted), { ...todo, courseId, handIn: true, rank: 1, at: todo.submitted });
     }
   }
   for (const list of events.values()) list.sort((a, b) => a.rank - b.rank || a.at - b.at);
@@ -113,7 +118,8 @@ function getCalEvents() {
 }
 
 function calFilterKey(event) {
-  return event.kind === "video" ? "video" : event.done ? "submitted" : "assign";
+  if (event.kind === "video") return event.done ? "watched" : "video";
+  return event.handIn ? "submitted" : event.done ? "done" : "assign";
 }
 
 function calTone(event) {
@@ -141,8 +147,42 @@ function createCalendarButton() {
   btn.addEventListener("click", toggleCalendar);
   (document.getElementById("tb-watch-btn") || anchor).after(btn);
   trackTone(btn);
+  createCalSynced(btn);
   todoSyncListeners.add(showCalSync);
   showCalSync(todoSync);
+}
+
+const CAL_SYNCED_TITLE =
+  "할 일 개수·미시청 영상·과제 달력을 e-class에서 마지막으로 읽은 시각이에요. 30분이 지나면 새로 읽고, 새로고침하면 바로 읽어요(10분에 1번).";
+
+// When todo.js last read e-class (the cache's time), so a list left over from earlier is easy to spot.
+// Hidden while a sync runs, when the ring below shows instead (calendar.css).
+function createCalSynced(btn) {
+  const synced = document.createElement("span");
+  synced.id = "tb-cal-synced";
+  btn.after(synced);
+  trackTone(synced);
+  chrome.storage.local.get("todoCache", (result) => paintCalSynced(result.todoCache));
+}
+
+// Courses the last sync couldn't read (todo.js keeps what was read before for them) turn it into a warning.
+function paintCalSynced(cache) {
+  const synced = document.getElementById("tb-cal-synced");
+  if (!synced) return;
+  const mine = readCalCache(cache);
+  synced.hidden = !mine?.time;
+  if (!mine?.time) return;
+  const at = calKey(new Date(mine.time)) === calKey(new Date()) ? calClock(mine.time) : formatTodoDate(mine.time);
+  const failed = mine.failed || [];
+  synced.classList.toggle("is-failed", failed.length > 0);
+  if (!failed.length) {
+    synced.textContent = `마지막 동기화 ${at}`;
+    synced.title = CAL_SYNCED_TITLE;
+    return;
+  }
+  const names = failed.map((id) => mine.names?.[id] || "과목").join(", ");
+  synced.textContent = mine.loggedOut ? "⚠ 로그인이 풀려 못 읽었어요" : `⚠ ${failed.length}과목 못 읽음 · ${at}`;
+  synced.title = `읽지 못한 과목: ${names}\n이전에 읽은 내용을 보여 주고 있어요. ${mine.loggedOut ? "다시 로그인한 뒤 " : ""}새로고침하면 다시 읽어요.`;
 }
 
 // While todo.js reads e-class, a ring next to the button shows how far it got; the calendar waits for it to finish.
@@ -169,9 +209,9 @@ function showCalSync(sync) {
     const percent = sync.total ? Math.floor((sync.done / sync.total) * 100) : 100;
     meter.setAttribute("aria-valuenow", percent);
     meter.querySelector(".tb-cal-sync-fill").style.strokeDasharray = `${percent} 100`;
-    meter.querySelector("b").textContent = sync.finished ? "동기화 완료" : `${percent}%`;
+    meter.querySelector("b").textContent = sync.finished ? (sync.failed ? "일부 못 읽음" : "동기화 완료") : `${percent}%`;
     meter.querySelector(".tb-cal-sync-note").textContent = sync.finished ? "" : `동기화 중 · ${Math.floor(sync.done)}/${sync.total} 과목`;
-    meter.classList.toggle("is-done", sync.finished);
+    meter.classList.toggle("is-done", sync.finished && !sync.failed);
     if (sync.finished) {
       setTimeout(() => meter.classList.add("is-leaving"), 1200);
       setTimeout(() => meter.remove(), 1600);
@@ -421,7 +461,9 @@ function renderCalendarDetail(detail, list, names) {
 }
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (!changes.todoCache || !document.getElementById("tb-cal")) return;
+  if (!changes.todoCache) return;
+  paintCalSynced(changes.todoCache.newValue);
+  if (!document.getElementById("tb-cal")) return;
   calCache = readCalCache(changes.todoCache.newValue);
   renderCalendar();
 });
