@@ -82,6 +82,11 @@
     color: #c2410c !important;
 }
 
+/* an assignment is due within 7 days (todo.js) */
+.tb-todo-assign.is-soon {
+    color: #b91c1c !important;
+}
+
 .tb-todo-video {
     color: #1d4ed8 !important;
 }
@@ -108,6 +113,10 @@
 
 .tb-on-dark .tb-todo-assign {
     color: #fdba74 !important;
+}
+
+.tb-on-dark .tb-todo-assign.is-soon {
+    color: #fca5a5 !important;
 }
 
 .tb-on-dark .tb-todo-video {
