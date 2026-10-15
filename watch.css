@@ -28,6 +28,14 @@
     transform: scale(0.98);
 }
 
+/* a video is open in the 미시청 영상 window (watch.js); the count is left out, so the text takes the room of its pill */
+#tb-watch-btn:disabled {
+    padding-right: 12px;
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
 #tb-watch-btn .tb-watch-icon {
     display: grid;
     place-items: center;
@@ -42,6 +50,14 @@
 
 #tb-watch-btn:hover .tb-watch-icon {
     transform: translateX(1px);
+}
+
+#tb-watch-btn:disabled .tb-watch-icon {
+    transform: none;
+}
+
+#tb-watch-btn:disabled .tb-watch-count {
+    display: none;
 }
 
 #tb-watch-btn svg {
