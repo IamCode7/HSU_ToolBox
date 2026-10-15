@@ -3,9 +3,13 @@
 const TODO_CACHE_KEY = "todoCache";
 // bumped when the cached entries change shape; 2: assignment ids, and submitted assignments with their submission time
 // 3: videos never opened, which earlier caches left out; 4: watched videos (done: true)
-// 5: study time and length of videos still to watch (seconds, length)
-const TODO_CACHE_VERSION = 5;
+// 5: study time and length of videos still to watch (seconds, length); 6: assignments without a deadline (end: null)
+const TODO_CACHE_VERSION = 6;
 const TODO_CACHE_MS = 30 * 60 * 1000;
+// reloading the page syncs again even within TODO_CACHE_MS, but only once per TODO_RELOAD_MS (counted from when that sync is saved)
+const TODO_RELOAD_KEY = "todoReloadSync";
+const TODO_RELOAD_MS = 10 * 60 * 1000;
+// a course badge counts every assignment still to hand in, and stands out when one is due within this
 const TODO_ASSIGN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Solar icon set by 480 Design (CC BY 4.0)
@@ -49,7 +53,7 @@ async function getVideoTodos(courseId) {
   }
   // the course page has the period of videos never opened, and the length the 미시청 영상 progress bars need
   if (videos.some((video) => !video.end || !video.done)) {
-    const details = await getVodDetails(courseId).catch(() => new Map());
+    const details = await getVodDetails(courseId);
     for (const video of videos) {
       const detail = details.get(video.title);
       if (!detail) continue;
@@ -60,7 +64,7 @@ async function getVideoTodos(courseId) {
   const dated = videos.filter((video) => video.end);
   // only videos still to watch need an id (to open the player)
   if (dated.some((video) => !video.done)) {
-    const ids = await getVodIds(courseId).catch(() => new Map());
+    const ids = await getVodIds(courseId);
     for (const video of dated) video.cmid = ids.get(video.title) ?? null;
   }
   return dated;
@@ -108,18 +112,20 @@ async function getSubmittedTime(cmid) {
 // Submitted assignments stay in the list (done: true) so the calendar can show them.
 // "submittedTimes" holds times read before: a submission can be replaced until the deadline, so only those past it are reused.
 // onProgress gets how much of this course is read (0–1): videos a quarter, the assignment list a quarter, submission times the rest.
+// A page that can't be read throws (fetchDeadlineDoc), so a course is either read whole or reported as not read.
 async function getCourseTodos(courseId, submittedTimes, onProgress = () => {}) {
-  const todos = await getVideoTodos(courseId).catch(() => []);
+  const todos = await getVideoTodos(courseId);
   onProgress(0.25);
-  const assignments = await getAssignments(courseId).catch(() => new Map());
+  const assignments = await getAssignments(courseId);
   onProgress(0.5);
   const reusable = (cmid, end) => submittedTimes.has(cmid) && end && end < Date.now();
   const reads = [...assignments].filter(([cmid, a]) => a.done && !reusable(cmid, a.end?.getTime())).length;
   let read = 0;
   for (const [cmid, assignment] of assignments) {
     const end = assignment.end?.getTime() ?? null;
+    // one without a deadline (end: null) counts on the badge too; the calendar has no day to file it under
     if (!assignment.done) {
-      if (end) todos.push({ kind: "assign", title: assignment.title, end, cmid });
+      todos.push({ kind: "assign", title: assignment.title, end, cmid });
       continue;
     }
     let submitted = submittedTimes.get(cmid);
@@ -150,7 +156,7 @@ function openTodoTip(badge, items) {
   closeTodoTip();
   const tip = document.createElement("div");
   tip.id = "tb-todo-tip";
-  tip.innerHTML = `<div class="tb-todo-tip-core"><span class="tb-todo-eyebrow">7일 안에 할 일</span></div>`;
+  tip.innerHTML = `<div class="tb-todo-tip-core"><span class="tb-todo-eyebrow">남은 할 일</span></div>`;
   for (const item of items) {
     // assignments link to their own page
     const row = document.createElement(item.kind === "assign" && item.cmid ? "a" : "div");
@@ -162,7 +168,8 @@ function openTodoTip(badge, items) {
     title.textContent = item.title;
     const due = document.createElement("span");
     due.className = "tb-todo-tip-due";
-    due.append(createDeadlineBadge({ start: item.start, end: item.end }), `${formatTodoDate(item.end)} 마감`);
+    if (item.end) due.append(createDeadlineBadge({ start: item.start, end: item.end }), `${formatTodoDate(item.end)} 마감`);
+    else due.textContent = "마감 없음";
     row.classList.add(`tb-todo-${item.kind}`);
     row.append(title, due);
     tip.firstElementChild.appendChild(row);
@@ -188,7 +195,8 @@ function closeTodoTipSoon() {
 
 function renderCourseTodos(badge, todos) {
   const now = Date.now();
-  const assigns = todos.filter((t) => t.kind === "assign" && !t.done && t.end > now && t.end - now <= TODO_ASSIGN_WINDOW_MS);
+  const assigns = todos.filter((t) => t.kind === "assign" && !t.done && (!t.end || t.end > now));
+  const soon = assigns.some((t) => t.end && t.end - now <= TODO_ASSIGN_WINDOW_MS);
   const videos = todos.filter((t) => t.kind === "video" && !t.done && t.start <= now && now <= t.end);
 
   const core = document.createElement("span");
@@ -201,11 +209,12 @@ function renderCourseTodos(badge, todos) {
     return;
   }
 
-  if (assigns.length) core.appendChild(createTodoPart("assign", `과제 ${assigns.length}`));
+  if (assigns.length) core.appendChild(createTodoPart("assign", `과제 ${assigns.length}`)).classList.toggle("is-soon", soon);
   if (videos.length) core.appendChild(createTodoPart("video", `영상 ${videos.length}`));
   badge.replaceChildren(core);
 
-  const items = [...assigns, ...videos].sort((a, b) => a.end - b.end);
+  // by deadline; those without one last
+  const items = [...assigns, ...videos].sort((a, b) => (a.end ?? Infinity) - (b.end ?? Infinity) || 0);
   badge.addEventListener("mouseenter", () => openTodoTip(badge, items));
   badge.addEventListener("mouseleave", closeTodoTipSoon);
 }
@@ -235,29 +244,50 @@ function startTodo() {
   const user = document.querySelector("nav.navbar .user_department")?.textContent.trim();
 
   // One course at a time: e-class handles a user's requests one by one, so this keeps the user's own clicks from queuing behind ours.
-  chrome.storage.local.get(TODO_CACHE_KEY, async (result) => {
+  chrome.storage.local.get([TODO_CACHE_KEY, TODO_RELOAD_KEY], async (result) => {
     const cache = result[TODO_CACHE_KEY];
     const mine = Boolean(cache) && cache.user === user && !Array.isArray(cache.todos);
-    const fresh = mine && cache.version === TODO_CACHE_VERSION && Date.now() - cache.time < TODO_CACHE_MS;
+    const reload = performance.getEntriesByType("navigation")[0]?.type === "reload" && !(Date.now() - (result[TODO_RELOAD_KEY] || 0) < TODO_RELOAD_MS);
+    const fresh = !reload && mine && cache.version === TODO_CACHE_VERSION && Date.now() - cache.time < TODO_CACHE_MS;
     const todos = fresh ? cache.todos : {};
+    // courses the last sync couldn't read are read again even within TODO_CACHE_MS
+    const retry = new Set(fresh ? cache.failed || [] : []);
     const submittedTimes = new Map(
       mine ? Object.values(cache.todos).flat().filter((t) => t.submitted).map((t) => [t.cmid, t.submitted]) : []
     );
     const names = Object.fromEntries(courses.map((course) => [course.id, course.name]));
-    const total = courses.filter((course) => !todos[course.id]).length;
+    const toRead = courses.filter((course) => !todos[course.id] || retry.has(course.id));
+    const total = toRead.length;
+    // Courses not read this time keep what was read before; calendar.js says so next to 과제 달력.
+    const failed = [];
+    let loggedOut = false;
     let done = 0;
     if (total) reportTodoSync({ done, total, finished: false });
     for (const course of courses) {
-      if (!todos[course.id]) {
-        todos[course.id] = await getCourseTodos(course.id, submittedTimes, (part) => reportTodoSync({ done: done + part, total, finished: false }));
+      if (toRead.includes(course)) {
+        try {
+          // once e-class has sent the login page the session is over, so the remaining courses aren't asked for
+          if (loggedOut) throw new Error("logged out");
+          todos[course.id] = await getCourseTodos(course.id, submittedTimes, (part) => reportTodoSync({ done: done + part, total, finished: false }));
+        } catch (error) {
+          loggedOut ||= Boolean(error.loggedOut);
+          failed.push(course.id);
+          if (mine && cache.todos[course.id]) todos[course.id] = cache.todos[course.id];
+        }
         reportTodoSync({ done: ++done, total, finished: false });
       }
-      renderCourseTodos(course.badge, todos[course.id]);
+      // a course never read yet gets no badge rather than a wrong "할 일 없음"
+      if (todos[course.id]) renderCourseTodos(course.badge, todos[course.id]);
+      else course.badge.remove();
     }
     // finished only once the cache is written, so the calendar opens on the new data
-    const finish = () => reportTodoSync({ done, total, finished: true });
+    const finish = () => reportTodoSync({ done, total, finished: true, failed: failed.length });
     if (total) {
-      chrome.storage.local.set({ [TODO_CACHE_KEY]: { version: TODO_CACHE_VERSION, user, time: fresh ? cache.time : Date.now(), todos, names } }, finish);
+      const update = {
+        [TODO_CACHE_KEY]: { version: TODO_CACHE_VERSION, user, time: fresh ? cache.time : Date.now(), todos, names, failed, loggedOut },
+      };
+      if (reload) update[TODO_RELOAD_KEY] = Date.now();
+      chrome.storage.local.set(update, finish);
     } else {
       finish();
     }
