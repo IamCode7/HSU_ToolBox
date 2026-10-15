@@ -3,13 +3,22 @@
 // 자동시청 is on, a live badge with a pause switch. It starts the video (via watch-player-main.js) and, when it ends, moves
 // on to the next one or closes the window.
 const WATCH_SESSION_KEY = "watchSession";
-// the site saves the finished position on its own "complete" handler; give that request time before leaving
+// the site saves the finished position on its own "complete" handler; give that request time before reading the report
+// and leaving
 const WATCH_NEXT_DELAY_MS = 3000;
 const WATCH_TOAST_MS = 2600;
 // watch-player-main.js replies within 4s; this only covers it not answering at all
 const WATCH_MAIN_TIMEOUT_MS = 5000;
+// while this window shows a video, the time is refreshed here so watch.js keeps the dashboard's 미시청 영상 button disabled
+// (pressing it would turn this window back into the list and stop the video)
+const WATCH_OPEN_KEY = "watchOpen";
+const WATCH_OPEN_BEAT_MS = 5000;
+// videos played here whose progress the list may not have yet; watch.js reads their reports again once the window closes
+const WATCH_STALE_KEY = "watchStale";
 const watchCmid = new URLSearchParams(location.search).get("id");
 let watchActive = false;
+// set when this window moves on to another video itself, which keeps the button disabled across the page change
+let watchMovingOn = false;
 // { mode: "auto" | "single", paused, queue: [{ cmid, title, course }], done: [cmid] }; paused: close after this video
 let watchSession = null;
 
@@ -28,6 +37,15 @@ function requestPlay() {
 
 function watchVideoUrl(cmid) {
   return `/mod/vod/viewer.php?id=${cmid}#tb-watch`;
+}
+
+function goToWatchVideo(cmid) {
+  watchMovingOn = true;
+  location.href = watchVideoUrl(cmid);
+}
+
+function markWatchOpen() {
+  chrome.storage.local.set({ [WATCH_OPEN_KEY]: Date.now() });
 }
 
 // Sends watch-player-main.js a request and resolves on its reply (or after WATCH_MAIN_TIMEOUT_MS).
@@ -58,10 +76,15 @@ function watchClock(text) {
   return clock ? clock.split(":").reduce((total, part) => total * 60 + Number(part), 0) : 0;
 }
 
-// Before going home: save where the video is now, then read this course's report again (as todo.js does) so the list's
-// progress bars show what was just watched, and a video the report now counts as attended leaves the list.
+// Before going home: save where the video is now, then read the report again.
 async function refreshWatchProgress() {
   await askMainWorld("tb-watch-save", "tb-watch-saved");
+  await rereadWatchReport();
+}
+
+// Reads this course's report again (as todo.js does) so the list's progress bars show what was just watched, and only a
+// video the report now counts as attended (출석 "O") leaves the list.
+async function rereadWatchReport() {
   const { todoCache: cache } = await new Promise((resolve) => chrome.storage.local.get("todoCache", resolve));
   const courseId = Object.keys(cache?.todos || {}).find((id) => cache.todos[id].some((t) => t.kind === "video" && t.cmid === watchCmid));
   if (!courseId) return;
@@ -118,7 +141,7 @@ function createWatchPicker() {
     groups.get(video.course).append(new Option(watchOptionText(video), video.cmid, false, video.cmid === watchCmid));
   }
   select.addEventListener("change", () => {
-    location.href = watchVideoUrl(select.value);
+    goToWatchVideo(select.value);
   });
   pick.append(select);
   pick.insertAdjacentHTML("beforeend", WATCH_ICONS.chevron);
@@ -194,23 +217,17 @@ function createWatchBar() {
 
 function onWatchEnded() {
   document.removeEventListener("ended", onWatchEnded, true);
-  setTimeout(() => {
-    chrome.storage.local.get([WATCH_SESSION_KEY, "todoCache"], (result) => {
+  setTimeout(async () => {
+    // Playing to the end is not attendance: the site counts a video only once its study time is enough (a resumed or
+    // partly watched video can end short of that), so the list follows the report instead of marking this one watched.
+    // A failed read leaves the list as it was.
+    await rereadWatchReport().catch(() => {});
+    chrome.storage.local.get(WATCH_SESSION_KEY, (result) => {
       const session = result[WATCH_SESSION_KEY];
       if (!session) return;
       session.done = [...new Set([...session.done, watchCmid])];
-      const update = { [WATCH_SESSION_KEY]: session };
 
-      // mark the finished video watched in the cached to-do list so counts and the calendar stay right until the next refresh
-      const cache = result.todoCache;
-      if (cache?.todos && !Array.isArray(cache.todos)) {
-        for (const id of Object.keys(cache.todos)) {
-          cache.todos[id] = cache.todos[id].map((t) => (t.kind === "video" && t.cmid === watchCmid ? { ...t, done: true } : t));
-        }
-        update.todoCache = cache;
-      }
-
-      chrome.storage.local.set(update, () => {
+      chrome.storage.local.set({ [WATCH_SESSION_KEY]: session }, () => {
         watchSession = session;
         const option = document.querySelector(`#tb-wp-select option[value="${watchCmid}"]`);
         const video = session.queue.find((v) => v.cmid === watchCmid);
@@ -224,9 +241,7 @@ function onWatchEnded() {
         const at = session.queue.findIndex((v) => v.cmid === watchCmid);
         const next = [...session.queue.slice(at + 1), ...session.queue.slice(0, at)].find((v) => !session.done.includes(v.cmid));
         if (next) {
-          leaveQuietly(() => {
-            location.href = watchVideoUrl(next.cmid);
-          });
+          leaveQuietly(() => goToWatchVideo(next.cmid));
           return;
         }
         showWatchToast("미시청 영상을 모두 봤어요");
@@ -246,6 +261,16 @@ if (location.hash === "#tb-watch") {
     if (!session?.queue.some((video) => video.cmid === watchCmid)) return;
     watchSession = session;
     watchActive = true;
+    markWatchOpen();
+    setInterval(markWatchOpen, WATCH_OPEN_BEAT_MS);
+    // marked now, while the page can still finish the write: on closing there is no time to read the report
+    chrome.storage.local.get(WATCH_STALE_KEY, (stored) => {
+      chrome.storage.local.set({ [WATCH_STALE_KEY]: [...new Set([...(stored[WATCH_STALE_KEY] || []), watchCmid])] });
+    });
+    // closing, reloading or going home frees the button at once; if this is missed, watch.js lets it go once the time is old
+    window.addEventListener("pagehide", () => {
+      if (!watchMovingOn) chrome.storage.local.remove(WATCH_OPEN_KEY);
+    });
     createWatchBar();
     // "ended" does not bubble, so listen in the capture phase for the player's <video>
     document.addEventListener("ended", onWatchEnded, true);
