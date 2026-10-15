@@ -39,8 +39,12 @@ function createDeadlineBadge({ start, end, done, doneText }) {
   return badge;
 }
 
+// A page that could not be read throws rather than reading as a page with nothing on it: an HTTP error, or the login page
+// e-class sends instead once the session has ended (loggedOut).
 async function fetchDeadlineDoc(path) {
   const res = await fetch(path);
+  if (new URL(res.url).pathname.startsWith("/login")) throw Object.assign(new Error("logged out"), { loggedOut: true });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return new DOMParser().parseFromString(await res.text(), "text/html");
 }
 
@@ -52,21 +56,25 @@ function parseClock(text) {
 
 let vodProgressRequest = null;
 
+// A course's attendance report by video title: study time so far and whether it counts as attended. Also used by watch.js.
+async function readVodReport(courseId) {
+  const doc = await fetchDeadlineDoc(`/report/ubcompletion/progress.php?id=${courseId}`);
+  const progress = new Map();
+  for (const row of doc.querySelectorAll("table.user_progress_table tbody tr")) {
+    const cells = [...row.cells];
+    const title = cells.findIndex((td) => td.classList.contains("text-left"));
+    if (title < 0) continue;
+    progress.set(cells[title].textContent.trim(), {
+      seconds: parseClock(cells[title + 1]?.firstChild?.textContent || ""),
+      attended: cells[title + 2]?.textContent.trim() === "O",
+    });
+  }
+  return progress;
+}
+
 // The attendance report is read once per page and shared with progress.js.
 function getVodProgress(courseId) {
-  vodProgressRequest ??= fetchDeadlineDoc(`/report/ubcompletion/progress.php?id=${courseId}`).then((doc) => {
-    const progress = new Map();
-    for (const row of doc.querySelectorAll("table.user_progress_table tbody tr")) {
-      const cells = [...row.cells];
-      const title = cells.findIndex((td) => td.classList.contains("text-left"));
-      if (title < 0) continue;
-      progress.set(cells[title].textContent.trim(), {
-        seconds: parseClock(cells[title + 1]?.firstChild?.textContent || ""),
-        attended: cells[title + 2]?.textContent.trim() === "O",
-      });
-    }
-    return progress;
-  });
+  vodProgressRequest ??= readVodReport(courseId);
   return vodProgressRequest;
 }
 
