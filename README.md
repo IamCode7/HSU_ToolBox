@@ -4,7 +4,7 @@
 
 한성대학교 e-class를 더 편하게 쓰기 위한 크롬 확장 프로그램
 
-![version](https://img.shields.io/badge/Chorme%20Web%20Store-v.3.1.0-red?style=flat&logo=chrome%20web%20store&logoColor=red&labelColor=1f2937)![manifest](https://img.shields.io/badge/Licenses-Apache%202.0-orange?style=flat&logoColor=orange&labelColor=1f2937)
+![version](https://img.shields.io/badge/Chorme%20Web%20Store-v.3.2.0-red?style=flat&logo=chrome%20web%20store&logoColor=red&labelColor=1f2937)![manifest](https://img.shields.io/badge/Licenses-Apache%202.0-orange?style=flat&logoColor=orange&labelColor=1f2937)    
 
 </div>
 
