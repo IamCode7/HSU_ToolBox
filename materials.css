@@ -1,0 +1,234 @@
+/* !important on colours: the palette extension forces text colour inside the page with !important.
+   Rings and dividers are box-shadows because the palette also forces border colours (as in calendar.css). */
+@keyframes tb-materials-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+/* e-class draws tile icons at their file's own size (64×64); this one is 192×192 for sharpness, so it is sized to match.
+   Two ids so it outranks the theme's "li#section-0 ul.section li.activity img.activityicon { width: auto }". */
+li#section-0 li#tb-materials-tile img.activityicon {
+    width: 64px;
+    height: 64px;
+}
+
+/* the list that opens under the overview's tiles (materials.js) */
+#tb-materials {
+    margin: 12px 0 4px;
+    padding: 5px;
+    border-radius: 22px;
+    background: rgba(24, 24, 27, 0.035);
+    box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.06);
+    font-family: var(--tb-font);
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+    animation: tb-materials-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+#tb-materials .tb-materials-core {
+    padding: 14px 8px 8px;
+    border-radius: 17px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 20px 50px -24px rgba(24, 24, 27, 0.18);
+}
+
+#tb-materials .tb-materials-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 6px;
+    color: #18181b !important;
+    font-size: 14px;
+}
+
+#tb-materials .tb-materials-head b {
+    color: inherit !important;
+    font-weight: 700;
+}
+
+#tb-materials .tb-materials-head span {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(24, 24, 27, 0.05);
+    color: #71717a !important;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+#tb-materials .tb-materials-head span:empty {
+    display: none;
+}
+
+/* many files scroll inside the card instead of stretching the page */
+#tb-materials .tb-materials-list {
+    max-height: 360px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(24, 24, 27, 0.2) transparent;
+}
+
+#tb-materials .tb-materials-week {
+    padding: 10px 8px 4px;
+    color: #71717a !important;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+#tb-materials .tb-materials-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: 10px;
+    color: #27272a !important;
+    font-size: 13px;
+    text-decoration: none !important;
+    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-materials .tb-materials-row:hover {
+    background: rgba(24, 24, 27, 0.04);
+}
+
+#tb-materials .tb-materials-row:focus {
+    outline: none;
+}
+
+#tb-materials .tb-materials-row:focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: -2px;
+}
+
+/* --tb-mat-c / --tb-mat-c-dark: the colour of the kind of file, from materials.js */
+#tb-materials .tb-materials-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--tb-mat-c) 10%, transparent);
+    color: var(--tb-mat-c) !important;
+}
+
+#tb-materials .tb-materials-icon svg {
+    width: 16px;
+    height: 16px;
+    color: inherit !important;
+}
+
+#tb-materials .tb-materials-name {
+    min-width: 0;
+    overflow: hidden;
+    color: inherit !important;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#tb-materials .tb-materials-note {
+    flex: none;
+    max-width: 40%;
+    margin-left: auto;
+    padding-left: 8px;
+    overflow: hidden;
+    color: #a1a1aa !important;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* the download arrow at the end of a row */
+#tb-materials .tb-materials-row > svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: #a1a1aa !important;
+    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-materials .tb-materials-row:hover > svg {
+    color: #18181b !important;
+    transform: translateY(1px);
+}
+
+#tb-materials .tb-materials-empty {
+    margin: 0;
+    padding: 4px 8px 8px;
+    color: #a1a1aa !important;
+    font-size: 12px;
+}
+
+/* dark backgrounds (tone.js) */
+#tb-materials.tb-on-dark {
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+#tb-materials.tb-on-dark .tb-materials-core {
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 20px 50px -24px rgba(0, 0, 0, 0.6);
+}
+
+#tb-materials.tb-on-dark .tb-materials-head {
+    color: #f4f4f5 !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-head span {
+    background: rgba(255, 255, 255, 0.08);
+    color: #d4d4d8 !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-icon {
+    background: color-mix(in srgb, var(--tb-mat-c-dark) 16%, transparent);
+    color: var(--tb-mat-c-dark) !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-list {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+#tb-materials.tb-on-dark .tb-materials-week {
+    color: #a1a1aa !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-row {
+    color: #e4e4e7 !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#tb-materials.tb-on-dark .tb-materials-note,
+#tb-materials.tb-on-dark .tb-materials-row > svg {
+    color: #71717a !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-row:hover > svg {
+    color: #f4f4f5 !important;
+}
+
+#tb-materials.tb-on-dark .tb-materials-row:focus-visible {
+    outline-color: #f4f4f5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #tb-materials,
+    #tb-materials * {
+        transition: none;
+        animation: none;
+    }
+}
