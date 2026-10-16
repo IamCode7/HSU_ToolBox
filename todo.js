@@ -1,5 +1,5 @@
-// Uses fetchDeadlineDoc, parseDeadlineDate, parseClock, DEADLINE_PERIOD, getAssignments and createDeadlineBadge from deadline.js
-// (loaded before this file).
+// Uses fetchDeadlineDoc, parseDeadlineDate, parseClock, DEADLINE_PERIOD, DEADLINE_URGENT_DAYS, getAssignments, getDeadlineDday
+// and createDeadlineBadge from deadline.js (loaded before this file).
 const TODO_CACHE_KEY = "todoCache";
 // bumped when the cached entries change shape; 2: assignment ids, and submitted assignments with their submission time
 // 3: videos never opened, which earlier caches left out; 4: watched videos (done: true)
@@ -9,8 +9,6 @@ const TODO_CACHE_MS = 30 * 60 * 1000;
 // reloading the page syncs again even within TODO_CACHE_MS, but only once per TODO_RELOAD_MS (counted from when that sync is saved)
 const TODO_RELOAD_KEY = "todoReloadSync";
 const TODO_RELOAD_MS = 10 * 60 * 1000;
-// a course badge counts every assignment still to hand in, and stands out when one is due within this
-const TODO_ASSIGN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Solar icon set by 480 Design (CC BY 4.0)
 const TODO_ICONS = {
@@ -196,7 +194,6 @@ function closeTodoTipSoon() {
 function renderCourseTodos(badge, todos) {
   const now = Date.now();
   const assigns = todos.filter((t) => t.kind === "assign" && !t.done && (!t.end || t.end > now));
-  const soon = assigns.some((t) => t.end && t.end - now <= TODO_ASSIGN_WINDOW_MS);
   const videos = todos.filter((t) => t.kind === "video" && !t.done && t.start <= now && now <= t.end);
 
   const core = document.createElement("span");
@@ -209,9 +206,21 @@ function renderCourseTodos(badge, todos) {
     return;
   }
 
-  if (assigns.length) core.appendChild(createTodoPart("assign", `과제 ${assigns.length}`)).classList.toggle("is-soon", soon);
+  if (assigns.length) core.appendChild(createTodoPart("assign", `과제 ${assigns.length}`));
   if (videos.length) core.appendChild(createTodoPart("video", `영상 ${videos.length}`));
   badge.replaceChildren(core);
+
+  // days to the nearest deadline; followed by how many are left when it is urgent (deadline.js)
+  const nearest = Math.min(...[...assigns, ...videos].filter((t) => t.end).map((t) => getDeadlineDday(t.end)));
+  if (nearest <= DEADLINE_URGENT_DAYS) {
+    const urgent = document.createElement("span");
+    urgent.className = "tb-todo-urgent";
+    urgent.textContent = nearest ? `마감까지 ${nearest}일 남았어요!` : "오늘 마감이에요!";
+    // beside the badge, not in it, so it takes the badge's place in the staggered fade-in itself
+    urgent.style.setProperty("--tb-todo-index", badge.style.getPropertyValue("--tb-todo-index"));
+    badge.after(urgent);
+    trackTone(urgent);
+  }
 
   // by deadline; those without one last
   const items = [...assigns, ...videos].sort((a, b) => (a.end ?? Infinity) - (b.end ?? Infinity) || 0);
