@@ -3,39 +3,50 @@
 const CAL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const CAL_CHIPS = 2;
 // [colour on light backgrounds, colour on dark backgrounds]:
-// red for an assignment still to do, blue for a video still to watch, green for a finished assignment or watched video
-// on its due day, grey for the day an assignment was handed in
+// red for an assignment still to do or a video still to watch, green for a finished assignment or watched video
+// on its due day, grey for the day an assignment was handed in, amber for memos written on the calendar;
+// blue is only the 영상 switch's track
 const CAL_TONES = {
   todo: ["#b91c1c", "#fca5a5"],
   video: ["#1d4ed8", "#93c5fd"],
   done: ["#15803d", "#86efac"],
   handIn: ["#52525b", "#a1a1aa"],
+  memo: ["#b45309", "#fcd34d"],
 };
-// the kinds the switches next to the month show or hide (calFilterKey): "video" is videos still to watch, "watched"
-// watched videos, "submitted" the day an assignment was handed in, "done" a submitted assignment on its due day
+// the kinds the switches next to the month show or hide (calFilterKey): "assign" assignments on their due day, still
+// to do or submitted, "video" videos still to watch and watched, "submitted" the day an assignment was handed in
 const CAL_FILTER_KEY = "calFilter";
 const CAL_FILTERS = [
-  { key: "assign", label: "남은 과제", tone: "todo" },
-  { key: "video", label: "미시청 영상", tone: "video" },
-  { key: "watched", label: "시청 완료 영상", tone: "done" },
+  { key: "assign", label: "과제", tone: "todo" },
+  { key: "video", label: "영상", tone: "video" },
   { key: "submitted", label: "제출 과제", tone: "handIn" },
-  { key: "done", label: "완료 과제", tone: "done" },
 ];
+// memos written on the calendar, one a day ({ "2026-10-16": ["팀플 회의 3시"] }); kept for the browser, not per user,
+// like memo.js
+const CAL_MEMO_KEY = "calMemos";
+const CAL_MEMO_MAX = 50;
 
 // Solar icon set by 480 Design (CC BY 4.0)
 const CAL_ICONS = {
   calendar: `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12c0-3.771 0-5.657 1.172-6.828S6.229 4 10 4h4c3.771 0 5.657 0 6.828 1.172S22 8.229 22 12v2c0 3.771 0 5.657-1.172 6.828S17.771 22 14 22h-4c-3.771 0-5.657 0-6.828-1.172S2 17.771 2 14z"/><path stroke-linecap="round" d="M7 4V2.5M17 4V2.5M2.5 9h19"/></g></svg>`,
   prev: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m15 5l-6 7l6 7"/></svg>`,
   next: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m9 5l6 7l-6 7"/></svg>`,
+  // the pen of memo.js's 메모 button, and plain plus and cross strokes
+  memo: `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></g></svg>`,
+  plus: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M12 5v14M5 12h14"/></svg>`,
+  remove: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M7 7l10 10M17 7L7 17"/></svg>`,
 };
 
 let calMonth = null;
 let calSelected = null;
 let calCache = null;
 let calOpenWhenSynced = false;
-let calFilter = { assign: true, video: true, watched: true, submitted: true, done: true };
+let calFilter = { assign: true, video: true, submitted: true };
 // kinds just switched on: their chips and rows ease in on the redraw that follows
 let calFresh = [];
+let calMemos = {};
+// the memo field under the selected day's heading is open
+let calMemoEditing = false;
 
 function calKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -118,12 +129,11 @@ function getCalEvents() {
 }
 
 function calFilterKey(event) {
-  if (event.kind === "video") return event.done ? "watched" : "video";
-  return event.handIn ? "submitted" : event.done ? "done" : "assign";
+  return event.handIn ? "submitted" : event.kind;
 }
 
 function calTone(event) {
-  return event.handIn ? "handIn" : event.done ? "done" : event.kind === "video" ? "video" : "todo";
+  return event.handIn ? "handIn" : event.done ? "done" : "todo";
 }
 
 function calIcon(event) {
@@ -229,6 +239,7 @@ function toggleCalendar() {
   const open = document.getElementById("tb-cal");
   if (open) {
     open.remove();
+    closeCalMemoTip();
     btn.setAttribute("aria-expanded", "false");
     return;
   }
@@ -243,6 +254,7 @@ function toggleCalendar() {
   const now = new Date();
   calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   calSelected = calKey(now);
+  calMemoEditing = false;
   const panel = document.createElement("section");
   panel.id = "tb-cal";
   panel.setAttribute("aria-label", "과제 달력");
@@ -252,17 +264,29 @@ function toggleCalendar() {
   trackTone(panel);
   renderCalendar();
 
-  chrome.storage.local.get("todoCache", (result) => {
+  chrome.storage.local.get(["todoCache", CAL_MEMO_KEY], (result) => {
     calCache = readCalCache(result.todoCache);
+    calMemos = result[CAL_MEMO_KEY] || {};
     renderCalendar();
   });
 }
 
 function onCalendarClick(e) {
+  const memoAdd = e.target.closest("[data-memo-add]");
+  const memoDelete = e.target.closest("[data-memo-delete]");
   const filter = e.target.closest("[data-filter]");
   const move = e.target.closest("[data-move]");
   const day = e.target.closest("[data-date]");
-  if (filter) {
+  if (memoAdd) {
+    calMemoEditing = !calMemoEditing;
+    renderCalendarDays(e.currentTarget);
+    return;
+  } else if (memoDelete) {
+    // the storage listener below redraws once it is saved
+    const index = Number(memoDelete.dataset.memoDelete);
+    saveCalMemos(calSelected, (calMemos[calSelected] || []).filter((_, i) => i !== index));
+    return;
+  } else if (filter) {
     // each switch flips its kind; "전체" turns every kind off when all are on, and every kind on otherwise
     const keys = filter.dataset.filter === "all" ? CAL_FILTERS.map(({ key }) => key) : [filter.dataset.filter];
     const on = !keys.every((key) => calFilter[key]);
@@ -286,7 +310,78 @@ function onCalendarClick(e) {
   } else {
     return;
   }
+  calMemoEditing = false;
   renderCalendar();
+}
+
+function saveCalMemos(day, memos) {
+  const next = { ...calMemos, [day]: memos };
+  if (!memos.length) delete next[day];
+  chrome.storage.local.set({ [CAL_MEMO_KEY]: next });
+}
+
+// The day's memos under its cell while the pointer is on it, like todo.js's tip under a course badge.
+function openCalMemoTip(day, memos) {
+  closeCalMemoTip();
+  const tip = document.createElement("div");
+  tip.id = "tb-cal-memo-tip";
+  tip.classList.toggle("tb-on-dark", Boolean(day.closest("#tb-cal.tb-on-dark")));
+  tip.innerHTML = `<div class="tb-cal-memo-tip-core"><span class="tb-cal-memo-tip-eyebrow">메모</span></div>`;
+  for (const memo of memos) {
+    const line = document.createElement("p");
+    line.textContent = memo;
+    tip.firstElementChild.append(line);
+  }
+  document.body.append(tip);
+  // below the cell, or above it when that would run off the bottom of the window
+  const rect = day.getBoundingClientRect();
+  const below = rect.bottom + 6 + tip.offsetHeight <= innerHeight;
+  tip.style.top = `${below ? rect.bottom + 6 : rect.top - 6 - tip.offsetHeight}px`;
+  tip.style.left = `${Math.min(rect.left, innerWidth - tip.offsetWidth - 8)}px`;
+}
+
+function closeCalMemoTip() {
+  document.getElementById("tb-cal-memo-tip")?.remove();
+}
+
+// What an empty day's list asks, which is also the memo field's placeholder: today, a day to come, or one gone by
+// (calKey's YYYY-MM-DD strings sort the way the days do).
+function getCalPrompt() {
+  const today = calKey(new Date());
+  return calSelected === today ? "오늘의 일정은 무엇인가요?" : calSelected > today ? "미리 계획을 세워볼까요?" : "지난날 무엇을 했나요?";
+}
+
+// The new memo is typed on a plain line set like the empty day's question, which stays as its placeholder
+// (so on an empty day the question itself turns writable). Enter or 저장 keeps up to CAL_MEMO_MAX characters,
+// Esc or an empty memo closes it.
+function createCalMemoForm() {
+  const form = document.createElement("form");
+  form.className = "tb-cal-memo-form";
+  form.innerHTML = `<input type="text" maxlength="${CAL_MEMO_MAX}" aria-label="메모"><span class="tb-cal-memo-count"></span><button type="submit">저장</button>`;
+  paintCalTone(form, "memo");
+  const input = form.querySelector("input");
+  input.placeholder = getCalPrompt();
+  const count = form.querySelector(".tb-cal-memo-count");
+  const showCount = () => {
+    count.textContent = `${input.value.length}/${CAL_MEMO_MAX}`;
+  };
+  const close = () => {
+    calMemoEditing = false;
+    renderCalendarDays(form.closest("#tb-cal"));
+  };
+  input.addEventListener("input", showCount);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+  });
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const memo = input.value.trim().slice(0, CAL_MEMO_MAX);
+    if (!memo) return close();
+    calMemoEditing = false;
+    saveCalMemos(calSelected, [memo]);
+  });
+  showCount();
+  return form;
 }
 
 function createCalChip(event) {
@@ -317,7 +412,7 @@ function renderCalendar() {
     <div class="tb-cal-core">
       <div class="tb-cal-head">
         <div>
-          <span class="tb-cal-eyebrow">과제·영상 마감과 제출</span>
+          <span class="tb-cal-eyebrow">이번주 과제는 다 끝내셨나요?</span>
           <div class="tb-cal-title">
             <div class="tb-cal-month">${year}년 ${month + 1}월</div>
             <div class="tb-cal-filter" role="group" aria-label="보여 줄 일정"></div>
@@ -335,7 +430,7 @@ function renderCalendar() {
     </div>`;
 
   const legend = panel.querySelector(".tb-cal-legend");
-  for (const [tone, label] of [["todo", "남은 과제"], ["video", "미시청"], ["done", "제출·시청 완료"], ["handIn", "제출한 날"]]) {
+  for (const [tone, label] of [["todo", "남은 과제·미시청"], ["done", "제출·시청 완료"], ["handIn", "제출한 날"]]) {
     const item = document.createElement("span");
     item.className = "tb-cal-legend-item";
     item.textContent = label;
@@ -360,8 +455,9 @@ function renderCalendar() {
   renderCalendarDays(panel);
 }
 
-// The grid and the selected day's list: the parts a filter switch changes.
+// The grid and the selected day's list: the parts a filter switch or a memo changes.
 function renderCalendarDays(panel) {
+  closeCalMemoTip();
   const events = getCalEvents();
   const names = getCalNames();
   const today = calKey(new Date());
@@ -383,7 +479,15 @@ function renderCalendarDays(panel) {
     day.classList.toggle("is-other", date.getMonth() !== month);
     day.classList.toggle("is-today", key === today);
     day.classList.toggle("is-selected", key === calSelected);
-    day.setAttribute("aria-label", `${date.getMonth() + 1}월 ${date.getDate()}일, 일정 ${list.length}개`);
+    const memos = calMemos[key] || [];
+    day.setAttribute("aria-label", `${date.getMonth() + 1}월 ${date.getDate()}일, 일정 ${list.length}개${memos.length ? `, 메모 ${memos.length}개` : ""}`);
+    // a day with memos gets an amber dot by its number (calendar.css), and shows them on hover
+    if (memos.length) {
+      day.classList.add("has-memo");
+      paintCalTone(day, "memo");
+      day.addEventListener("mouseenter", () => openCalMemoTip(day, memos));
+      day.addEventListener("mouseleave", closeCalMemoTip);
+    }
 
     const num = document.createElement("span");
     num.className = `tb-cal-num${date.getDay() === 0 ? " is-sun" : date.getDay() === 6 ? " is-sat" : ""}`;
@@ -411,22 +515,38 @@ function calDueDate(ms) {
 
 function renderCalendarDetail(detail, list, names) {
   const [year, month, day] = calSelected.split("-").map(Number);
+  const memos = calMemos[calSelected] || [];
   const head = document.createElement("div");
   head.className = "tb-cal-detail-head";
-  head.textContent = `${month}월 ${day}일 ${CAL_WEEKDAYS[new Date(year, month - 1, day).getDay()]}요일`;
+  head.innerHTML = `<span></span>`;
+  head.firstChild.textContent = `${month}월 ${day}일 ${CAL_WEEKDAYS[new Date(year, month - 1, day).getDay()]}요일`;
+  // one memo a day: only a day without one gets the +
+  if (!memos.length) {
+    head.insertAdjacentHTML("beforeend", `<button type="button" class="tb-cal-memo-add" data-memo-add aria-label="메모 추가" title="메모 추가">${CAL_ICONS.plus}</button>`);
+    head.lastChild.setAttribute("aria-expanded", calMemoEditing);
+    paintCalTone(head.lastChild, "memo");
+  }
   detail.append(head);
 
-  if (!list.length) {
+  // the day's own memo comes before its deadlines
+  for (const [index, memo] of memos.entries()) {
+    const row = document.createElement("div");
+    row.className = "tb-cal-row tb-cal-memo";
+    row.innerHTML = `<span class="tb-cal-row-icon">${CAL_ICONS.memo}</span><span class="tb-cal-row-text"><span class="tb-cal-row-title"></span></span><button type="button" class="tb-cal-memo-remove" aria-label="메모 지우기">${CAL_ICONS.remove}</button>`;
+    row.querySelector(".tb-cal-row-title").textContent = memo;
+    row.lastChild.dataset.memoDelete = index;
+    paintCalTone(row, "memo");
+    detail.append(row);
+  }
+
+  if (calMemoEditing && !memos.length) {
+    detail.append(createCalMemoForm());
+    detail.querySelector(".tb-cal-memo-form input").focus();
+  } else if (!list.length && !memos.length) {
     const empty = document.createElement("p");
     empty.className = "tb-cal-empty";
-    const filtered = CAL_FILTERS.some(({ key }) => !calFilter[key]);
-    empty.textContent = calCache
-      ? filtered
-        ? "켜 둔 종류에는 이날 일정이 없어요."
-        : "이날은 마감이나 제출한 과제가 없어요."
-      : "과제·영상 마감을 불러오는 중이에요…";
+    empty.textContent = calCache ? getCalPrompt() : "과제·영상 마감을 불러오는 중이에요…";
     detail.append(empty);
-    return;
   }
 
   for (const event of list) {
@@ -467,6 +587,17 @@ chrome.storage.onChanged.addListener((changes) => {
   calCache = readCalCache(changes.todoCache.newValue);
   renderCalendar();
 });
+
+// memos saved here or in another tab
+chrome.storage.onChanged.addListener((changes) => {
+  if (!changes[CAL_MEMO_KEY]) return;
+  calMemos = changes[CAL_MEMO_KEY].newValue || {};
+  const panel = document.getElementById("tb-cal");
+  if (panel) renderCalendarDays(panel);
+});
+
+// the memo tip is placed once under its day, so it would be left behind when the page scrolls
+window.addEventListener("scroll", closeCalMemoTip, { passive: true });
 
 chrome.storage.local.get(CAL_FILTER_KEY, (result) => {
   calFilter = { ...calFilter, ...result[CAL_FILTER_KEY] };
