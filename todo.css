@@ -82,17 +82,29 @@
     color: #c2410c !important;
 }
 
-/* an assignment is due within 7 days (todo.js) */
-.tb-todo-assign.is-soon {
-    color: #b91c1c !important;
-}
-
 .tb-todo-video {
     color: #1d4ed8 !important;
 }
 
 .tb-todo-clear {
     color: #15803d !important;
+}
+
+/* beside a badge when something it counts is due within DEADLINE_URGENT_DAYS (deadline.js): red text only, as tall as the badge */
+.tb-todo-urgent {
+    display: inline-block;
+    margin-left: 8px;
+    color: #b91c1c !important;
+    font-family: var(--tb-font);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 24px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+    animation: tb-todo-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--tb-todo-index, 0) * 80ms);
 }
 
 /* dark backgrounds (tone.js) */
@@ -115,16 +127,16 @@
     color: #fdba74 !important;
 }
 
-.tb-on-dark .tb-todo-assign.is-soon {
-    color: #fca5a5 !important;
-}
-
 .tb-on-dark .tb-todo-video {
     color: #93c5fd !important;
 }
 
 .tb-on-dark .tb-todo-clear {
     color: #86efac !important;
+}
+
+.tb-todo-urgent.tb-on-dark {
+    color: #fca5a5 !important;
 }
 
 .tb-on-dark .tb-todo-part + .tb-todo-part {
@@ -223,6 +235,7 @@
 @media (prefers-reduced-motion: reduce) {
     .tb-todo,
     .tb-todo-core,
+    .tb-todo-urgent,
     #tb-todo-tip {
         transition: none;
         animation: none;
