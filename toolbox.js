@@ -7,9 +7,10 @@ const TOOLBOX_FEATURES = [
   { key: "todo", label: "할 일 개수" },
   { key: "watch", label: "미시청 영상" },
   { key: "calendar", label: "과제 달력" },
+  { key: "materials", label: "수업 자료 모음" },
 ];
 
-let toolboxSettings = { memo: true, dday: true, deadline: true, progress: true, todo: true, watch: true, calendar: true };
+let toolboxSettings = { memo: true, dday: true, deadline: true, progress: true, todo: true, watch: true, calendar: true, materials: true };
 
 function applyToolboxSettings() {
   for (const { key } of TOOLBOX_FEATURES) {
