@@ -480,6 +480,7 @@
 }
 
 #tb-cal .tb-cal-num {
+    position: relative;
     display: grid;
     place-items: center;
     width: 22px;
@@ -505,7 +506,19 @@
     color: #ffffff !important;
 }
 
-/* --tb-cal-c / --tb-cal-bg (and their -dark twins) are set by calendar.js: red to do, blue video to watch, green done, grey hand-in day */
+/* a day with memos: an amber dot by its number (--tb-cal-c from calendar.js) */
+#tb-cal .tb-cal-day.has-memo .tb-cal-num::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: -5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--tb-cal-c);
+}
+
+/* --tb-cal-c / --tb-cal-bg (and their -dark twins) are set by calendar.js: red to do or to watch, green done, grey hand-in day */
 #tb-cal .tb-cal-chip {
     display: flex;
     align-items: center;
@@ -551,10 +564,18 @@
 }
 
 #tb-cal .tb-cal-detail-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 6px;
     color: #18181b !important;
     font-size: 13px;
     font-weight: 700;
+}
+
+/* the day's name sits in a <span> beside the +, and e-class colours spans itself */
+#tb-cal .tb-cal-detail-head span {
+    color: inherit !important;
 }
 
 #tb-cal .tb-cal-empty {
@@ -562,6 +583,166 @@
     padding: 6px 0 4px;
     color: #a1a1aa !important;
     font-size: 12px;
+}
+
+/* + next to the day's heading; while a memo is being written it turns amber and into × (--tb-cal-c / --tb-cal-bg:
+   the memo amber from calendar.js) */
+#tb-cal .tb-cal-memo-add {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(24, 24, 27, 0.05);
+    color: #52525b !important;
+    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-cal .tb-cal-memo-add:hover {
+    background: rgba(24, 24, 27, 0.09);
+    color: #27272a !important;
+}
+
+#tb-cal .tb-cal-memo-add[aria-expanded="true"] {
+    background: var(--tb-cal-bg);
+    color: var(--tb-cal-c) !important;
+}
+
+#tb-cal .tb-cal-memo-add svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-cal .tb-cal-memo-add[aria-expanded="true"] svg {
+    transform: rotate(45deg);
+}
+
+/* the new memo is typed on a plain line set like the empty day's question (.tb-cal-empty), with no box around it */
+#tb-cal .tb-cal-memo-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+/* e-class styles inputs too, so every part of the look is set here */
+#tb-cal .tb-cal-memo-form input {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #27272a !important;
+    caret-color: var(--tb-cal-c);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+#tb-cal .tb-cal-memo-form input::placeholder {
+    color: #a1a1aa;
+    opacity: 1;
+}
+
+#tb-cal .tb-cal-memo-count {
+    flex: none;
+    color: #a1a1aa !important;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 저장: amber text, tinted on hover */
+#tb-cal .tb-cal-memo-form button {
+    flex: none;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    color: var(--tb-cal-c) !important;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-cal .tb-cal-memo-form button:hover {
+    background: var(--tb-cal-bg);
+}
+
+/* a memo wraps rather than being cut short, and ends in its × */
+#tb-cal .tb-cal-memo .tb-cal-row-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#tb-cal .tb-cal-memo-remove {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    margin-left: auto;
+    border-radius: 50%;
+    color: #a1a1aa !important;
+    transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#tb-cal .tb-cal-memo-remove:hover {
+    background: rgba(24, 24, 27, 0.06);
+    color: #27272a !important;
+}
+
+#tb-cal .tb-cal-memo-remove svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* a day's memos while the pointer is on its cell; it lives in <body>, so the colours carry !important too */
+#tb-cal-memo-tip {
+    position: fixed;
+    z-index: 2147483647;
+    max-width: 260px;
+    padding: 4px;
+    border-radius: 16px;
+    background: rgba(24, 24, 27, 0.04);
+    box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.06), 0 20px 60px -15px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    animation: tb-cal-fresh-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+#tb-cal-memo-tip .tb-cal-memo-tip-core {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    font-family: var(--tb-font);
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+}
+
+#tb-cal-memo-tip .tb-cal-memo-tip-eyebrow {
+    align-self: flex-start;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(180, 83, 9, 0.1);
+    color: #b45309 !important;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+#tb-cal-memo-tip p {
+    margin: 0;
+    color: #27272a !important;
+    font-weight: 500;
+    overflow-wrap: anywhere;
 }
 
 #tb-cal .tb-cal-row {
@@ -818,8 +999,66 @@
     color: #a1a1aa !important;
 }
 
-#tb-cal.tb-on-dark .tb-cal-legend-item::before {
+#tb-cal.tb-on-dark .tb-cal-legend-item::before,
+#tb-cal.tb-on-dark .tb-cal-day.has-memo .tb-cal-num::after {
     background: var(--tb-cal-c-dark);
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-add {
+    background: rgba(255, 255, 255, 0.08);
+    color: #d4d4d8 !important;
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-add:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #f4f4f5 !important;
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-add[aria-expanded="true"] {
+    background: var(--tb-cal-bg-dark);
+    color: var(--tb-cal-c-dark) !important;
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-form input {
+    color: #f4f4f5 !important;
+    caret-color: var(--tb-cal-c-dark);
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-form button {
+    color: var(--tb-cal-c-dark) !important;
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-form button:hover {
+    background: var(--tb-cal-bg-dark);
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-count,
+#tb-cal.tb-on-dark .tb-cal-memo-remove {
+    color: #71717a !important;
+}
+
+#tb-cal.tb-on-dark .tb-cal-memo-remove:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f4f4f5 !important;
+}
+
+#tb-cal-memo-tip.tb-on-dark {
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 60px -15px rgba(0, 0, 0, 0.6);
+}
+
+#tb-cal-memo-tip.tb-on-dark .tb-cal-memo-tip-core {
+    background: #27272a;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+#tb-cal-memo-tip.tb-on-dark .tb-cal-memo-tip-eyebrow {
+    background: rgba(252, 211, 77, 0.14);
+    color: #fcd34d !important;
+}
+
+#tb-cal-memo-tip.tb-on-dark p {
+    color: #e4e4e7 !important;
 }
 
 #tb-cal.tb-on-dark .tb-cal-detail {
@@ -845,6 +1084,7 @@
     #tb-cal-btn,
     #tb-cal-sync,
     #tb-cal-sync *,
+    #tb-cal-memo-tip,
     #tb-cal * {
         transition: none;
         animation: none;
