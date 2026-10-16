@@ -4,7 +4,7 @@
 
 한성대학교 e-class를 더 편하게 쓰기 위한 크롬 확장 프로그램
 
-![version](https://img.shields.io/badge/Chorme%20Web%20Store-v.3.2.0-red?style=flat&logo=chrome%20web%20store&logoColor=red&labelColor=1f2937)![manifest](https://img.shields.io/badge/Licenses-Apache%202.0-orange?style=flat&logoColor=orange&labelColor=1f2937)    
+![version](https://img.shields.io/badge/Chorme%20Web%20Store-v.4.0.0-red?style=flat&logo=chrome%20web%20store&logoColor=red&labelColor=1f2937)![manifest](https://img.shields.io/badge/Licenses-Apache%202.0-orange?style=flat&logoColor=orange&labelColor=1f2937)    
 
 </div>
 
@@ -18,7 +18,8 @@
 | 📊 시청 진도   | 강의 영상을 얼마나 봤는지 표시              |
 | ✅ 할 일 개수  | 아직 끝내지 않은 강의·과제 개수             |
 | ▶️ 미시청 영상 | 아직 보지 않은 영상을 한 창에 모아 보기     |
-| 🗓️ 과제 달력   | 마감일을 달력으로 한눈에 확인               |
+| 🗓️ 과제 달력   | 마감일을 달력으로 확인하고 날짜별 메모 작성 |
+| 📂 수업 자료   | 강의의 모든 파일을 주차별로 모아 내려받기   |
 
 > [!TIP]
 > 쓰지 않는 기능은 도구 메뉴에서 하나씩 끌 수 있다.
