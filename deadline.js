@@ -1,4 +1,7 @@
-const DEADLINE_DAY_MS = 24 * 60 * 60 * 1000;
+// Uses getDdayCount from dday.js (loaded before this file).
+// Due within this many days (D-5 at most) is urgent: the time-left badge turns red, and the dashboard's course badges
+// say how many days are left (todo.js).
+const DEADLINE_URGENT_DAYS = 5;
 const DEADLINE_PERIOD = /(\d{4}-\d{2}-\d{2} [\d:]+) ~ (\d{4}-\d{2}-\d{2} [\d:]+)/;
 
 function parseDeadlineDate(text) {
@@ -12,6 +15,12 @@ function formatDeadlineSpan(ms) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}시간`;
   return `${Math.floor(hours / 24)}일 ${hours % 24}시간`;
+}
+
+// Days from today to the due day; a 00:00 deadline is the end of the day before (end - 1), as on the calendar.
+function getDeadlineDday(end) {
+  const due = new Date(end - 1);
+  return getDdayCount(`${due.getFullYear()}-${due.getMonth() + 1}-${due.getDate()}`);
 }
 
 function createDeadlineBadge({ start, end, done, doneText }) {
@@ -28,8 +37,7 @@ function createDeadlineBadge({ start, end, done, doneText }) {
     state = "muted";
     text = "기간 종료";
   } else {
-    const days = Math.floor((end - now) / DEADLINE_DAY_MS);
-    state = days < 1 ? "urgent" : days <= 3 ? "warn" : "normal";
+    state = getDeadlineDday(end) <= DEADLINE_URGENT_DAYS ? "urgent" : "normal";
     text = `${formatDeadlineSpan(end - now)} 남음`;
   }
 
